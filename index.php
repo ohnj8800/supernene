@@ -13,6 +13,10 @@ header("Expires: Sat, 26 Jul 1997 05:00:00 GMT"); // Date in the past
     <link href="css/style.css" rel="stylesheet">
 </head>
 <body>
+    <header>
+        <h1>蘇聖元 自我介紹網站</h1>
+    </header>
+
     <div class="container">
         <div class="row">
             <div class="col-md-12">
@@ -27,11 +31,7 @@ header("Expires: Sat, 26 Jul 1997 05:00:00 GMT"); // Date in the past
             </div>
         </div>
     </div>
-
-    <header>
-        <h1>蘇聖元 自我介紹網站</h1>
-    </header>
-
+    
     <div class="container">
         <img src="IMG_6477.gif"  class="profile-pic">
         <div class="description">
