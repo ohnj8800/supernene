@@ -1,35 +1,26 @@
 <?php
-// 禁止缓存
+// 防止缓存
 header("Cache-Control: no-cache, must-revalidate");
-header("Expires: Sat, 26 Jul 1997 05:00:00 GMT");
+header("Expires: Sat, 26 Jul 1997 05:00:00 GMT"); 
 
 // 连接数据库
-$servername = "localhost";
-$username = "your_db_username";
-$password = "your_db_password";
-$dbname = "your_database_name";
+include "../inc/dbinfo.inc"; // 请确保 dbinfo.inc 包含你的数据库配置
+$connection = mysqli_connect(DB_SERVER, DB_USERNAME, DB_PASSWORD);
 
-// 创建连接
-$conn = new mysqli($servername, $username, $password, $dbname);
-
-// 检查连接是否成功
-if ($conn->connect_error) {
-    die("連接失敗: " . $conn->connect_error);
+if (mysqli_connect_errno()) {
+    echo "Failed to connect to MySQL: " . mysqli_connect_error();
 }
 
-// 插入数据
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['name'])) {
-    $name = $_POST['name'];
-    $email = $_POST['email'];
-    $description = $_POST['description'];
+$database = mysqli_select_db($connection, DB_DATABASE);
 
-    $sql = "INSERT INTO user_info (name, email, description) VALUES ('$name', '$email', '$description')";
+// 确保 EMPLOYEES 表存在
+VerifyEmployeesTable($connection, DB_DATABASE);
 
-    if ($conn->query($sql) === TRUE) {
-        echo "新增成功!";
-    } else {
-        echo "錯誤: " . $sql . "<br>" . $conn->error;
-    }
+// 检查是否有新的数据提交
+$employee_name = htmlentities($_POST['NAME']);
+$employee_address = htmlentities($_POST['ADDRESS']);
+if (strlen($employee_name) || strlen($employee_address)) {
+    AddEmployee($connection, $employee_name, $employee_address);
 }
 ?>
 
@@ -39,7 +30,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['name'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>蘇聖元 自我介紹網站</title>
-    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="index.css"> 
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
 </head>
@@ -48,53 +39,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['name'])) {
         <h1>蘇聖元 自我介紹網站</h1>
     </header>
 
-    <!-- MySQL 数据插入表单 -->
+    <!-- MySQL 数据输入表单 -->
     <div class="container">
-        <h2>新增使用者資料</h2>
-        <form action="" method="post">
-            <label for="name">名稱:</label>
-            <input type="text" id="name" name="name" required><br>
-
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required><br>
-
-            <label for="description">簡介:</label>
-            <textarea id="description" name="description" required></textarea><br>
-
-            <input type="submit" value="新增資料">
+        <h2>輸入員工資料</h2>
+        <form action="<?php echo $_SERVER['SCRIPT_NAME'] ?>" method="POST">
+            <div class="form-group">
+                <label for="name">姓名：</label>
+                <input type="text" name="NAME" class="form-control" maxlength="45" required>
+            </div>
+            <div class="form-group">
+                <label for="address">地址：</label>
+                <input type="text" name="ADDRESS" class="form-control" maxlength="90" required>
+            </div>
+            <button type="submit" class="btn btn-primary">新增資料</button>
         </form>
     </div>
 
-    <!-- 查询数据库并显示结果 -->
-    <div class="container">
-        <h2>使用者列表</h2>
-        <table class="table table-bordered">
+    <!-- 数据库数据展示 -->
+    <div class="container mt-4">
+        <h2>員工列表</h2>
+        <table class="table table-striped">
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>名稱</th>
-                    <th>Email</th>
-                    <th>簡介</th>
+                    <th>姓名</th>
+                    <th>地址</th>
                 </tr>
             </thead>
             <tbody>
                 <?php
-                // 从数据库中查询数据并显示
-                $sql = "SELECT id, name, email, description FROM user_info";
-                $result = $conn->query($sql);
-
-                if ($result->num_rows > 0) {
-                    while($row = $result->fetch_assoc()) {
-                        echo "<tr>
-                                <td>{$row['id']}</td>
-                                <td>{$row['name']}</td>
-                                <td>{$row['email']}</td>
-                                <td>{$row['description']}</td>
-                              </tr>";
-                    }
-                } else {
-                    echo "<tr><td colspan='4'>無資料</td></tr>";
+                $result = mysqli_query($connection, "SELECT * FROM EMPLOYEES");
+                while($query_data = mysqli_fetch_row($result)) {
+                    echo "<tr><td>$query_data[0]</td><td>$query_data[1]</td><td>$query_data[2]</td></tr>";
                 }
+                mysqli_free_result($result);
                 ?>
             </tbody>
         </table>
@@ -111,6 +89,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['name'])) {
 </html>
 
 <?php
+// 添加员工到数据库
+function AddEmployee($connection, $name, $address) {
+   $n = mysqli_real_escape_string($connection, $name);
+   $a = mysqli_real_escape_string($connection, $address);
+   $query = "INSERT INTO EMPLOYEES (NAME, ADDRESS) VALUES ('$n', '$a')";
+   if(!mysqli_query($connection, $query)) echo("<p>Error adding employee data.</p>");
+}
+
+// 确认表是否存在，如果不存在则创建
+function VerifyEmployeesTable($connection, $dbName) {
+  if(!TableExists("EMPLOYEES", $connection, $dbName)) {
+     $query = "CREATE TABLE EMPLOYEES (
+         ID int(11) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+         NAME VARCHAR(45),
+         ADDRESS VARCHAR(90)
+       )";
+     if(!mysqli_query($connection, $query)) echo("<p>Error creating table.</p>");
+  }
+}
+
+// 检查表是否存在
+function TableExists($tableName, $connection, $dbName) {
+  $t = mysqli_real_escape_string($connection, $tableName);
+  $d = mysqli_real_escape_string($connection, $dbName);
+  $checktable = mysqli_query($connection, "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_NAME = '$t' AND TABLE_SCHEMA = '$d'");
+  if(mysqli_num_rows($checktable) > 0) return true;
+  return false;
+}
+
 // 关闭数据库连接
-$conn->close();
+mysqli_close($connection);
 ?>
